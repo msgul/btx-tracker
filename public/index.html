@@ -1,15 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>BTC Tracker</title>
+    <title>BTX TRACKER</title>
+
+    <style>
+        #main-div,body, html{
+            width: 100%;
+            height: 100%;
+            margin: auto;
+        }
+
+        #form-div{
+            width: 500px;
+            margin: auto;
+        }
+
+        #result{
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: blanchedalmond;
+        }
+
+    </style>
+
+    <script src="https://cdn.anychart.com/releases/8.8.0/js/anychart-core.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.8.0/js/anychart-graph.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.8.0/js/anychart-data-adapter.min.js"></script>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <nav id="top-nav" class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <a class="navbar-brand" href="#">BTX TRACKER</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+        <div class="navbar-nav">
+          <a class="nav-item nav-link active" href="#">Transaction Tracker<span class="sr-only">(current)</span></a>
+          <a class="nav-item nav-link" href="#">Key Tracker</a>
+        </div>
+      </div>
+    </nav>
 </head>
 <body>
-    <div>Adres Giriniz</div>
-    <form action="/deneme" method="post">
-        <input name="source" type="text" value="1NtdUY29S7GWpSmue9aG2NRUojtajFuhah">
-        <br>
-        <input name="destination" type="text" value="1GrW11oX9iwNiuDWEPNXgk2XXhFzHbE6zg">
-        <input type="submit" value="send">
-    </form>
+
+    <div id="main-div">
+      <form id="form-div" action="/track" method="post">
+          <div class="form-row align-items-center">
+            <div class="col-auto my-1">
+              <input name="src" type="text" class="form-control" id="inlineFormInputName" placeholder="First address" value="148NdjP4xY6SjMMjiYufBfkssj1hNjznGL">
+            </div>
+            <div class="col-auto my-1">
+              <input name="dest" type="text" class="form-control" id="inlineFormInputName" placeholder="Second address" value="1DBtMda4iJwErJ9T4UxmZarBe5BKQtyWiY">
+            </div>
+            <div class="col-auto my-1">
+              <button type="submit" class="btn btn-primary">Track</button>
+            </div>
+          </div>
+        </form>
+
+        <div id="result"></div>
+
+
+    </div>
+    
+    <script>
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var data = JSON.parse(xhttp.responseText); 
+            console.log(data);
+
+            var chart = anychart.graph(data);
+            chart.edges().tooltip().format("from: {%from}\nto: {%to}\nvalue: {%val} BTC\ntime: {%time}")
+            // set the title
+            chart.title("Tx Graph");
+            // draw the chart
+            chart.container("result").draw();
+
+            }
+        };
+
+        xhttp.open("GET", "/track", true);
+        xhttp.send();
+
+    </script>
+
+
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 </body>
 </html>
