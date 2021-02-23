@@ -2,41 +2,45 @@ var express = require('express');
 var app = express();
 var path = require('path');
 var bodyParser = require('body-parser');
-
+var http = require('http').createServer(app);
+var io = require('socket.io')(http);
 var blockexplorer = require('blockchain.info/blockexplorer');
+const fs = require('fs');
 app.use(express.static('public'))
 var port = process.env.PORT || 8080;
 
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
-var data = {nodes:[], edges:[]};
+//let rawdata = fs.readFileSync('criminals.json');
+//let criminals = JSON.parse(rawdata);
+//console.log(criminals.med);
 
 app.get('/', function(req, res) {
     res.sendFile(path.join(__dirname + '/public/index.html'));
 });
 
-app.post('/track', function(req, res) {
-    var src = req.body.src
-    var dest = req.body.dest
-    bfs(src,dest);
-});
+io.on('connection', function (socket) {
+    console.log("connected.");
 
-app.get('/track', function(req, res) {
-    res.send(data);
+    socket.on('track', async(src,dest) => {
+        console.log(src,dest);
+        let data = await bfs(src,dest);
+        socket.emit('new data', data);
+    });
 });
 
 var bfs = async(src,dest) => {
-    var queue = [];
-    var visited = [];
-    var calledBy = [];
-    data = { nodes: [], edges: []};
+    let queue = [];
+    let visited = [];
+    let calledBy = [];
+    let data = {nodes:[], edges:[]};
 
     var new_node = {
         id: src,
-        normal: { height:"40", shape: "diamond",fill:"green"},
-        hovered: { height:"50", shape: "diamond",fill:"white"},
-        selected: { height:"50", shape: "diamond",fill:"white"}
+        normal:{height:"40", shape:"diamond", fill:"green"},
+        hovered:{height:"50", shape:"diamond", fill:"white"},
+        selected:{height:"50", shape:"diamond", fill:"white"}
     };
 
     data.nodes.push(new_node);
@@ -62,24 +66,24 @@ var bfs = async(src,dest) => {
 
         var transactions = adr.txs;
 
-        for(t in transactions){
+        for(let transaction of transactions){
 
-            var time = transactions[t].time;
-            time = new Date(time * 1000);
-            console.log(time);
-
+            let time = transaction.time;
+            time = new Date(time * 1000).toLocaleString();
             var receiver = true;
-            for(i in transactions[t].inputs){
-                if(address == transactions[t].inputs[i].prev_out.addr){
+
+            for(let input of transaction.inputs){
+                if(address == input.prev_out.addr){
                     receiver = false;
                 }
             }
 
             if(receiver){
-                for(i in transactions[t].inputs){
-                
-                    var adr_in = transactions[t].inputs[i].prev_out.addr;
-                    var value = transactions[t].inputs[i].prev_out.value/100000000;
+                for(let input of transaction.inputs){
+
+                    let adr_in = input.prev_out.addr;
+                    let value = input.prev_out.value/100000000;
+                    /* value will be modified */
                     if(adr_in && !visited[adr_in]){
                         calledBy[adr_in] = address;
     
@@ -104,9 +108,9 @@ var bfs = async(src,dest) => {
                 }
             }
             else{
-                for(i in transactions[t].out){
-                    var adr_out = transactions[t].out[i].addr;
-                    var value = transactions[t].out[i].value/100000000;
+                for(output of transaction.out){
+                    let adr_out = output.addr;
+                    let value = output.value/100000000;
                     if(adr_out && !visited[adr_out]){
                         calledBy[adr_out] = address;
     
@@ -117,7 +121,7 @@ var bfs = async(src,dest) => {
 
                             new_node = {
                                 id: adr_out,
-                                normal:{ height:"40", shape: "star5",fill:"red"},
+                                normal:{ height:"40", shape: "diamond",fill:"red"},
                                 hovered: { height:"40", shape: "diamond",fill:"white"},
                                 selected: { height:"40", shape: "diamond",fill:"white"}
                             };
@@ -133,22 +137,13 @@ var bfs = async(src,dest) => {
             }
         }
     }
-
-    if(found){
-        console.log("->",dest);
-        while(calledBy[dest] &&  dest != src){
-            dest = calledBy[dest];
-            console.log("->",dest);
-        }
-    }
-    else{
-        console.log("no relation");
-    }
-
-    console.log(data);
+/*
+    if(!found)
+        data = -1;
+*/
+    return data;
 }
 
-app.listen(port, function(){
+http.listen(port, function(){
     console.log("Running on port",port);
 });
-
