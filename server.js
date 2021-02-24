@@ -6,6 +6,7 @@ var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var blockexplorer = require('blockchain.info/blockexplorer');
 const fs = require('fs');
+const { exit } = require('process');
 app.use(express.static('public'))
 var port = process.env.PORT || 8080;
 
@@ -24,37 +25,26 @@ io.on('connection', function (socket) {
     console.log("connected.");
 
     socket.on('track', async(src,dest) => {
-        console.log(src,dest);
+        console.log("tracking",src,dest);
         let data = await bfs(src,dest);
-        socket.emit('new data', data);
+        console.log("sending data to client");
+        socket.emit('graph', data);
     });
 });
 
 var bfs = async(src,dest) => {
+
+    let iter = 0;
+    let itermax = 1;
     let queue = [];
     let visited = [];
     let calledBy = [];
     let data = {nodes:[], edges:[]};
 
-    var new_node = {
-        id: src,
-        normal:{height:"40", shape:"diamond", fill:"green"},
-        hovered:{height:"50", shape:"diamond", fill:"white"},
-        selected:{height:"50", shape:"diamond", fill:"white"}
-    };
-
-    data.nodes.push(new_node);
-
     queue.push(src); 
-    var found = false;
 
-    while(queue.length != 0 && !found){
+    while(queue.length != 0 && iter<itermax){
         var address = queue.shift();
-
-        if(visited[address])
-            continue;
-        
-        visited[address] = true;
 
         try{
             adr = await blockexplorer.getAddress(address);
@@ -64,83 +54,113 @@ var bfs = async(src,dest) => {
             continue;
         }
 
-        var transactions = adr.txs;
+        var cb_counter = 0;
+        let transactions = adr.txs;
+        let final_balance = adr.final_balance/100000000;
+        if(!visited[address]){
 
+            var new_node = {
+                id: src, group:"adr", balance:final_balance,
+                normal:{height:"40", shape:"circle", fill:"green"},
+                hovered:{height:"50", shape:"circle", fill:"white"},
+                selected:{height:"50", shape:"circle", fill:"white"}
+            };
+
+            data.nodes.push(new_node);
+            visited[src] = true;
+        }
+        
         for(let transaction of transactions){
 
-            let time = transaction.time;
-            time = new Date(time * 1000).toLocaleString();
-            var receiver = true;
+            let reciever = false;
+            for(let input of transaction.inputs){
+                if(input.prev_out && input.prev_out.addr == address);{    
+                    reciever = true;
+                    break;
+                }
+            }
+
+            let new_node,new_edge;
+            let thash = transaction.hash;
+            let time = new Date(transaction.time * 1000).toLocaleString();
+
+            if(visited[thash])
+                continue;
+            
+            visited[thash] = true;
+
+            new_node = {
+                id: thash, group:"tx", time: time
+            };
+
+            data.nodes.push(new_node);
+
+            
 
             for(let input of transaction.inputs){
-                if(address == input.prev_out.addr){
-                    receiver = false;
+
+                if(!input.prev_out){ // coinbase transaction
+                    new_node = {
+                            id: "coinbase" + cb_counter, group:"cb",
+                            normal:{ height:"20", shape: "circle",fill:{ src: "bitcoin-mining.jpg" }},
+                            hovered: { height:"20", shape: "circle",fill:"white"},
+                            selected: { height:"20", shape: "circle",fill:"white"}
+                    };
+    
+                    data.nodes.push(new_node);
+                    new_edge = {"from":"coinbase" + cb_counter, "to":thash, "val":"REWARD" /*will modified*/, "time":time};
+                    data.edges.push(new_edge);
+    
+                    cb_counter++;
+                    continue;
                 }
+    
+                let adr_in = input.prev_out.addr;
+                let value = input.prev_out.value/100000000;
+
+
+                if(!visited[adr_in]){
+                    //calledBy[adr_in] = address;
+                    visited[adr_in] = true;
+
+                    new_node = {"id":adr_in, group:"adr", balance:"(?)"};
+
+                    data.nodes.push(new_node);
+                }
+                
+                new_edge = {"from":adr_in,"to":thash,"val":value,"time":time};
+                data.edges.push(new_edge);
+
+                queue.push(adr_in);
+
+                
             }
 
-            if(receiver){
-                for(let input of transaction.inputs){
+            for(output of transaction.out){
+                let adr_out = output.addr;
+                let value = output.value/100000000;
+                    
+                if(!visited[adr_out]){
 
-                    let adr_in = input.prev_out.addr;
-                    let value = input.prev_out.value/100000000;
-                    /* value will be modified */
-                    if(adr_in && !visited[adr_in]){
-                        calledBy[adr_in] = address;
-    
-                        var new_node = {"id":adr_in};
-    
-                        if(adr_in == dest){
-                            found = true;
-                            
-                            new_node = {
-                                id: adr_in,
-                                normal:{ height:"40", shape: "diamond",fill:"red"},
-                                hovered: { height:"50", shape: "diamond",fill:"white"},
-                                selected: { height:"50", shape: "diamond",fill:"white"}
-                            };
-                        }
-                        
-                        data.nodes.push(new_node);
-                        var new_edge = {"from":adr_in,"to":address,"val":value,"time":time};
-                        data.edges.push(new_edge);
-                        queue.push(adr_in);
-                    }
+                    visited[adr_out] = true;
+                    new_node = {id: adr_out, group:"adr", balance:"(?)"};
+                
+                    data.nodes.push(new_node);
                 }
-            }
-            else{
-                for(output of transaction.out){
-                    let adr_out = output.addr;
-                    let value = output.value/100000000;
-                    if(adr_out && !visited[adr_out]){
-                        calledBy[adr_out] = address;
-    
-                        var new_node = {"id":adr_out};
-    
-                        if(adr_out == dest){
-                            found = true;
+                
+                if(!reciever || adr_out != address ){
 
-                            new_node = {
-                                id: adr_out,
-                                normal:{ height:"40", shape: "diamond",fill:"red"},
-                                hovered: { height:"40", shape: "diamond",fill:"white"},
-                                selected: { height:"40", shape: "diamond",fill:"white"}
-                            };
-                        }
+                    new_edge = {"from":thash,"to":adr_out,"val":value,"time":time, format:"--{%id}--"};
+                    data.edges.push(new_edge);
 
-                        data.nodes.push(new_node);
-                        var new_edge = {"from":address,"to":adr_out,"val":value,"time":time};
-                        data.edges.push(new_edge);
-
-                        queue.push(adr_out);
-                    }
+                    queue.push(adr_out);
                 }
             }
         }
+
+        iter++;
     }
-/*
-    if(!found)
-        data = -1;
-*/
+    
     return data;
 }
 
