@@ -21,12 +21,13 @@ socket.on('connect', () => {
         txs.selected().shape("diamond");
         txs.selected().fill("black");
 
-        chart.nodes().labels().enabled(true);
+        //chart.group("tx").labels().enabled(true);
 
         chart.group("tx").labels().format("{%time}");
-        chart.group("adr").labels().format("{%balance} BTC");
+        //chart.group("adr").labels().format("{%balance} BTC");
 
-        chart.edges().tooltip().format("from: {%from}\nto: {%to}\nvalue: {%val} BTC")
+        chart.edges().tooltip().format("value: {%val} BTC\ntype: {%tip}");
+        chart.nodes().tooltip().format("hash: {%id}")
         // set the title
         chart.title("Tx Graph");
         // draw the chart

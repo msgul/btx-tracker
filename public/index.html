@@ -30,28 +30,26 @@
 
         <div id="tx-tracker" class="form-row align-items-center">
 
-            <div class="col-auto my-1">
-              <input id="src" type="text" class="form-control" id="inlineFormInputName" placeholder="First address" value="1GYRmoKxZtjGXcSJ8AdQm2h4Y8MtfBvw6q">
-            </div>
-            <div class="col-auto my-1">
-              <input id="dest" type="text" class="form-control" id="inlineFormInputName" placeholder="Second address" value="19twUjpR7fQdGxs3SVcbdRTvaXqo6tDeD7">
-            </div>
-            <div class="col-auto my-1">
-              <button onclick="track('tx_track')" class="btn btn-primary">Track</button>
-            </div>
-
-        </div>
-
-        <div id="key-tracker" class="form-row align-items-center">
-
-            <div class="col-auto my-1">
-              <input id="adr" type="text" class="form-control" id="inlineFormInputName" placeholder="First address" value="1GYRmoKxZtjGXcSJ8AdQm2h4Y8MtfBvw6q">
-            </div>
-            <div class="col-auto my-1">
-              <button onclick="track('key_track')" class="btn btn-primary">Track</button>
+            <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">Keys</span>
+                </div>
+                <input id="src" type="text" aria-label="First Address" class="form-control" value="1GYRmoKxZtjGXcSJ8AdQm2h4Y8MtfBvw6q">
+                <input id="dest" type="text" aria-label="Second Address" class="form-control" value="19twUjpR7fQdGxs3SVcbdRTvaXqo6tDeD7">
+                <div class="input-group-append">
+                    <button onclick="track('tx_track')" class="btn btn-outline-secondary" type="button">Track</button>
+                </div>
             </div>
 
-        </div>
+            <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">Key</span>
+                </div>
+                <input id="adr" type="text" aria-label="First Address" class="form-control" value="1KEZVroPWqamicxTGoAPcgCpGe3KBVw1c8">
+                <div class="input-group-append">
+                    <button onclick="track('key_track')" class="btn btn-outline-secondary" type="button">Track</button>
+                </div>
+            </div>
 
 
         <div id="result"></div>
