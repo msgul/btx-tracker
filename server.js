@@ -27,9 +27,9 @@ app.get('/', function(req, res) {
 io.on('connection', function (socket) {
     console.log(socket.id, "connected.");
 
-    socket.on('track', async(src,dest) => {
+    socket.on('track', async(src,dest,iter) => {
         console.log("tracking...");
-        let data = await bfs(src,dest);
+        let data = await bfs(src,dest,iter);
         if(data != -1){
             console.log("sending graph to client");
             console.log("nodes:",data.nodes.length);
@@ -44,10 +44,9 @@ io.on('connection', function (socket) {
     });
 });
 
-var bfs = async(src,dest) => {
+var bfs = async(src,dest,itermax) => {
 
     let iter = 0; // current iteration count
-    let itermax = 2; // maximum iteration count
     let queue = [];
     let visited = [];
     let apicalled = [];
@@ -68,6 +67,7 @@ var bfs = async(src,dest) => {
 
         try{
             adr = await blockexplorer.getAddress(address);
+            console.log(address, adr.address);
         }
         catch{
             console.log("API ERROR: ",address);
@@ -82,9 +82,9 @@ var bfs = async(src,dest) => {
 
             var new_node = {
                 id: address, group:"adr", balance:final_balance,
-                normal:{height:"40", shape:"circle", fill:"green"},
-                hovered:{height:"50", shape:"circle", fill:"white"},
-                selected:{height:"50", shape:"circle", fill:"white"}
+                normal:{height:"20", shape:"circle", fill:"lime"},
+                hovered:{height:"25", shape:"circle", fill:"white"},
+                selected:{height:"25", shape:"circle", fill:"white"}
             };
 
             data.nodes.push(new_node);
@@ -124,7 +124,7 @@ var bfs = async(src,dest) => {
                 if(!input.prev_out){ // coinbase transaction
 
                     new_node = {
-                            id: "coinbase" + cb_id, group:"cb",
+                            id: "coinbase" + cb_id, group:"cb", balance:"(?)",
                             normal:{ height:"20", shape: "circle",fill:{ src: "bitcoin-mining.jpg" }},
                             hovered: { height:"20", shape: "circle",fill:"white"},
                             selected: { height:"20", shape: "circle",fill:"white"}
@@ -136,7 +136,7 @@ var bfs = async(src,dest) => {
                         "to":thash,
                         "val":"REWARD",
                         "time":time, tip:"input",
-                        normal: {stroke:  {color: "green"}}
+                        normal: {stroke:  {color: "green",thickness: 3}}
                     };
 
                     data.edges.push(new_edge);
@@ -161,32 +161,34 @@ var bfs = async(src,dest) => {
                     }
 
                     new_edge = {"from":adr_in,"to":thash,"val":value, tip:"input",
-                        normal: {stroke:  {color: "green"}
+                        normal: {stroke:  {color: "green",thickness: 3}
                     }};
 
                     data.edges.push(new_edge);
 
                     queue.push(adr_in);
                 }
-                else{
+                else{ // P2PWKY
+
                     let script = input.prev_out.script;
+                    let value = input.prev_out.value/100000000;
 
                     if(!visited[script]){
 
                         visited[script] = true;
                         new_node = {
-                            id: script, group:"adr",
-                            normal:{ height:"20", shape: "circle",fill:"brown"},
-                            hovered: { height:"20", shape: "circle",fill:"white"},
-                            selected: { height:"20", shape: "circle",fill:"white"}
+                            id: script, group:"adr", balance:"(?)",
+                            normal:{ height:"15", shape: "circle",fill:"brown"},
+                            hovered: { height:"15", shape: "circle",fill:"white"},
+                            selected: { height:"15", shape: "circle",fill:"white"}
                         };
 
                         data.nodes.push(new_node);
 
                     }
                     
-                    new_edge = {"from":script,"to":thash, "val":"MIXVAL", tip:"output",
-                    normal: {stroke:  {color: "red"}}};
+                    new_edge = {"from":script,"to":thash, "val":value, tip:"input",
+                    normal: {stroke:  {color: "green",thickness: 3}}};
                     data.edges.push(new_edge);
                 }
             }
@@ -195,15 +197,21 @@ var bfs = async(src,dest) => {
             if(mixing){
                 new_node = {
                     id: "mixing" + mixing_id, group:"adr",
-                    normal:{ height:"40", shape: "circle",fill:"purple"},
-                    hovered: { height:"40", shape: "circle",fill:"white"},
-                    selected: { height:"40", shape: "circle",fill:"white"}
+                    normal:{ height:"30", shape: "circle",fill:"purple"},
+                    hovered: { height:"30", shape: "circle",fill:"white"},
+                    selected: { height:"30", shape: "circle",fill:"white"}
                 };
                 data.nodes.push(new_node);
 
                 new_edge = {"from":thash,"to":"mixing" + mixing_id, "val":"MIXVAL", tip:"output",
-                normal: {stroke:  {color: "red"}}};
+                normal: {stroke:  {color: "red",thickness: 3}}};
                 data.edges.push(new_edge);
+
+                if(receiver){
+                    new_edge = {"from":thash,"to":address, "val":"MIXVAL", tip:"output"};
+                    data.edges.push(new_edge);
+                }
+
                 mixing_id++;
             }
             else
@@ -214,6 +222,8 @@ var bfs = async(src,dest) => {
 
                 if(!receiver && adr_out == address) // self transaction
                     continue;
+
+                // if found ...
                     
                 if(!visited[adr_out]){ // if node not in data create one
 
@@ -223,7 +233,7 @@ var bfs = async(src,dest) => {
                 }
 
                 new_edge = {"from":thash,"to":adr_out, "val":value, tip:"output",
-                normal: {stroke:  {color: "red"}}};
+                normal: {stroke:  {color: "red",thickness: 3}}};
 
                 data.edges.push(new_edge);
                 queue.push(adr_out);
