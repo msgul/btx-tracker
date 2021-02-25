@@ -6,7 +6,6 @@ var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var blockexplorer = require('blockchain.info/blockexplorer');
 const fs = require('fs');
-const { exit } = require('process');
 app.use(express.static('public'))
 var port = process.env.PORT || 8080;
 
@@ -66,14 +65,13 @@ var bfs = async(src,dest,itermax) => {
         apicalled[address] = true;
 
         try{
-            adr = await blockexplorer.getAddress(address);
-            console.log(address, adr.address);
+            var adr = await blockexplorer.getAddress(address);
+            console.log("API CALL", adr.address);
         }
         catch{
             console.log("API ERROR: ",address);
             continue;
         }
-
 
         let transactions = adr.txs;
         let final_balance = adr.final_balance/100000000;
@@ -121,7 +119,9 @@ var bfs = async(src,dest,itermax) => {
             //-------------------- inputs --------------------
             for(let input of transaction.inputs){
                 
-                if(!input.prev_out){ // coinbase transaction
+
+                //-------------------- is coinbase --------------------
+                if(!input.prev_out){ 
 
                     new_node = {
                             id: "coinbase" + cb_id, group:"cb", balance:"(?)",
@@ -144,6 +144,9 @@ var bfs = async(src,dest,itermax) => {
                     cb_id++;
                     continue;
                 }
+
+                // mixing input control will be added.
+
                 if(input.prev_out.addr){
 
                     let adr_in = input.prev_out.addr;
@@ -161,14 +164,14 @@ var bfs = async(src,dest,itermax) => {
                     }
 
                     new_edge = {"from":adr_in,"to":thash,"val":value, tip:"input",
-                        normal: {stroke:  {color: "green",thickness: 3}
+                        normal: {stroke:  {color: "green",thickness: 2}
                     }};
 
                     data.edges.push(new_edge);
 
                     queue.push(adr_in);
                 }
-                else{ // P2PWKY
+                else{ //-------------------- P2WPKH --------------------
 
                     let script = input.prev_out.script;
                     let value = input.prev_out.value/100000000;
@@ -194,7 +197,9 @@ var bfs = async(src,dest,itermax) => {
             }
 
             // -------------------- outputs --------------------
-            if(mixing){
+
+
+            if(mixing){ // -------------------- mixing --------------------
                 new_node = {
                     id: "mixing" + mixing_id, group:"adr",
                     normal:{ height:"30", shape: "circle",fill:"purple"},
@@ -204,11 +209,12 @@ var bfs = async(src,dest,itermax) => {
                 data.nodes.push(new_node);
 
                 new_edge = {"from":thash,"to":"mixing" + mixing_id, "val":"MIXVAL", tip:"output",
-                normal: {stroke:  {color: "red",thickness: 3}}};
+                    normal: {stroke:  {color: "red",thickness: 2}}};
                 data.edges.push(new_edge);
 
                 if(receiver){
-                    new_edge = {"from":thash,"to":address, "val":"MIXVAL", tip:"output"};
+                    new_edge = {"from":thash,"to":address, "val":"MIXVAL", tip:"output",
+                        normal: {stroke:  {color: "red",thickness: 2}}};
                     data.edges.push(new_edge);
                 }
 
@@ -228,12 +234,37 @@ var bfs = async(src,dest,itermax) => {
                 if(!visited[adr_out]){ // if node not in data create one
 
                     visited[adr_out] = true;
-                    new_node = {id: adr_out, group:"adr", balance:"(?)"};
+
+                    if(!adr_out){   // -------------------- P2WPKY --------------------
+                        adr_out = output.script;
+
+                        new_node = {
+                            id: adr_out, group:"adr", balance:"(?)",
+                            normal:{ height:"15", shape: "circle",fill:"brown"},
+                            hovered: { height:"15", shape: "circle",fill:"white"},
+                            selected: { height:"15", shape: "circle",fill:"white"}
+                        };
+
+                    }
+                    else if(adr_out[0] == '3') // -------------------- P2SH --------------------
+                    {
+                        new_node = {
+                            id: adr_out, group:"adr", balance:"(?)",
+                            normal:{ height:"15", shape:"circle", fill:"purple"},
+                            hovered: { height:"15", shape:"circle", fill:"white"},
+                            selected: { height:"15", shape:"circle", fill:"white"}    
+                        };
+                    }
+                    else{ // -------------------- P2PKH --------------------
+                        new_node = {id: adr_out, group:"adr", balance:"(?)"};
+                    }
+
+
                     data.nodes.push(new_node);
                 }
 
                 new_edge = {"from":thash,"to":adr_out, "val":value, tip:"output",
-                normal: {stroke:  {color: "red",thickness: 3}}};
+                normal: {stroke:  {color: "red",thickness: 2}}};
 
                 data.edges.push(new_edge);
                 queue.push(adr_out);
@@ -245,6 +276,8 @@ var bfs = async(src,dest,itermax) => {
     
     return data;
 }
+
+
 
 http.listen(port, function(){
     console.log("Running on port",port);
