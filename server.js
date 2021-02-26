@@ -16,8 +16,7 @@ app.use(bodyParser.json())
 // let criminals = JSON.parse(rawdata);
 // console.log(criminals.med);
 
-const mixing_threshold = 20; // can be modified
-// mixing edgeler birleştirilip çizgili olacak
+const mixing_threshold = 30; // can be modified
 
 app.get('/', function(req, res) {
     res.sendFile(path.join(__dirname + '/public/index.html'));
@@ -45,13 +44,13 @@ io.on('connection', function (socket) {
 
 var bfs = async(src,dest,itermax) => {
 
-    let iter = 0; // current iteration count
+    let iter = 0; // current api call count
     let queue = [];
     let visited = [];
     let apicalled = [];
     let data = {nodes:[], edges:[]};
-    let cb_id = 0;
-    let mixing_id = 0;
+    let cb_id = 0; // coinbase count
+    let mixing_id = 0; // mixing count
 
     queue.push(src); 
 
@@ -64,9 +63,22 @@ var bfs = async(src,dest,itermax) => {
 
         apicalled[address] = true;
 
+        let ofst = 0;
+        let tx_limit = 50;
+
         try{
-            var adr = await blockexplorer.getAddress(address);
-            console.log("API CALL", adr.address);
+            var adr = await blockexplorer.getAddress(address,{offset:ofst}); // default limit = 50, max limit = 50
+            
+            var adr2 = adr;
+
+            while(adr2.txs.length == 50 && adr.txs.length < tx_limit){        
+                ofst += 50;                                                   
+                adr2 = await blockexplorer.getAddress(address,{offset:ofst});  // if transactions are at max
+                adr.txs = adr.txs.concat(adr2.txs);                            // make another api call to get the rest
+            }                                                                  
+            
+            
+            console.log("adr:",adr.address,"n_tx:",adr.txs.length);
         }
         catch{
             console.log("API ERROR: ",address);
@@ -98,36 +110,63 @@ var bfs = async(src,dest,itermax) => {
         // -------------------- transactions --------------------
         for(let transaction of transactions){
 
-            let mixing = false;
-            if(transaction.out.length > mixing_threshold)
-                mixing = true;
-
-            let receiver = true;
-            let new_node,new_edge;
             let thash = transaction.hash;
-            let time = new Date(transaction.time * 1000).toLocaleDateString();
 
             if(visited[thash])
                 continue;
-            
+
             visited[thash] = true;
+
+            let mixing_in = false;
+            let mixing_out = false;
+
+            if(transaction.vin_sz > mixing_threshold)
+                mixing_in = true;
+
+            if(transaction.vout_sz > mixing_threshold)
+                mixing_out = true;
+
+            let receiver = true;
+            let new_node,new_edge;
+            
+            let time = new Date(transaction.time * 1000).toLocaleDateString();
 
             new_node = {id: thash, group:"tx", time: time};
 
             data.nodes.push(new_node);
 
-            //-------------------- inputs --------------------
-            for(let input of transaction.inputs){
-                
+            if(mixing_in){ // -------------------- mixing in --------------------
+                new_node = {
+                    id: "mixing_in" + mixing_id + "-" + transaction.vin_size, group:"adr",
+                    normal:{ height:"30", shape: "circle",fill:"purple"},
+                    hovered: { height:"30", shape: "circle",fill:"white"},
+                    selected: { height:"30", shape: "circle",fill:"white"}
+                };
+                data.nodes.push(new_node);
 
-                //-------------------- is coinbase --------------------
-                if(!input.prev_out){ 
+                new_edge = {"from":thash,"to":"mixing_in" + mixing_id + "-" + transaction.vin_size, "val":"MIXVAL", tip:"output",
+                    normal: {stroke:  {color: "red",thickness: 2}}};
+                data.edges.push(new_edge);
+
+                if(receiver){
+                    new_edge = {"from":thash,"to":address, "val":"MIXVAL", tip:"output",
+                        normal: {stroke:  {color: "red",thickness: 2}}};
+                    data.edges.push(new_edge);
+                }
+
+                mixing_id++;
+            }
+            else
+            
+            for(let input of transaction.inputs){ //-------------------- inputs --------------------
+
+                if(!input.prev_out){ //-------------------- is coinbase --------------------
 
                     new_node = {
                             id: "coinbase" + cb_id, group:"cb", balance:"(?)",
-                            normal:{ height:"20", shape: "circle",fill:{ src: "bitcoin-mining.jpg" }},
-                            hovered: { height:"20", shape: "circle",fill:"white"},
-                            selected: { height:"20", shape: "circle",fill:"white"}
+                            normal:{ height:"30", shape: "circle",fill:{ src: "bitcoin-mining.jpg" }},
+                            hovered: { height:"30", shape: "circle",fill:"white"},
+                            selected: { height:"30", shape: "circle",fill:"white"}
                     };
 
                     data.nodes.push(new_node);
@@ -147,7 +186,7 @@ var bfs = async(src,dest,itermax) => {
 
                 // mixing input control will be added.
 
-                if(input.prev_out.addr){
+                if(input.prev_out.addr){ // 
 
                     let adr_in = input.prev_out.addr;
 
@@ -199,16 +238,16 @@ var bfs = async(src,dest,itermax) => {
             // -------------------- outputs --------------------
 
 
-            if(mixing){ // -------------------- mixing --------------------
+            if(mixing_out){ // -------------------- mixing out --------------------
                 new_node = {
-                    id: "mixing" + mixing_id, group:"adr",
+                    id: "mixing_out" + mixing_id, group:"adr",
                     normal:{ height:"30", shape: "circle",fill:"purple"},
                     hovered: { height:"30", shape: "circle",fill:"white"},
                     selected: { height:"30", shape: "circle",fill:"white"}
                 };
                 data.nodes.push(new_node);
 
-                new_edge = {"from":thash,"to":"mixing" + mixing_id, "val":"MIXVAL", tip:"output",
+                new_edge = {"from":thash,"to":"mixing_out" + mixing_id, "val":"MIXVAL", tip:"output",
                     normal: {stroke:  {color: "red",thickness: 2}}};
                 data.edges.push(new_edge);
 
@@ -258,7 +297,6 @@ var bfs = async(src,dest,itermax) => {
                     else{ // -------------------- P2PKH --------------------
                         new_node = {id: adr_out, group:"adr", balance:"(?)"};
                     }
-
 
                     data.nodes.push(new_node);
                 }
