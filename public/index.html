@@ -24,7 +24,7 @@
       </div>
     </nav>
 </head>
-<body>
+<body onload="hide()">
 
     <div id="main-div">
 
@@ -53,10 +53,14 @@
             </div>
         </div>
 
-
-
-
-        <div id="result"></div>
+        <div id="results-div">
+            <div id="loading-div" class="spinner-border" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+    
+            <div id="result"></div>
+        </div>
+        
     </div>
 
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>

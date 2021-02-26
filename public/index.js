@@ -5,6 +5,15 @@ socket.on('connect', () => {
 
     socket.on('graph', (data) => {
 
+        document.getElementById("result").innerHTML = "";
+
+        loading_div = document.getElementById("loading-div");
+        loading_div.style.display = 'none';
+
+        result = document.getElementById("result");
+        result.style.display = 'block';
+
+
         var chart = anychart.graph(data);
 
         var txs = chart.group("tx");
@@ -51,7 +60,12 @@ socket.on('connect', () => {
 
 function track(track_mode){
 
-    document.getElementById("result").innerHTML = "";
+    loading_div = document.getElementById("loading-div");
+    loading_div.style.display = 'block';
+
+    result = document.getElementById("result");
+    result.style.display = 'none';
+
     var src,dest;
 
     if(track_mode == "tx_track"){
@@ -66,5 +80,10 @@ function track(track_mode){
     }
 
     socket.emit("track",src,dest,iter);
+}
+
+function hide(){
+    result_div = document.getElementById("result");
+    result_div.style.display = 'none';
 }
 
